@@ -1,37 +1,33 @@
 import logging
 import socket
+import time
 from urllib.parse import unquote, urlparse
 
 import psycopg2
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import QueuePool
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+_MAX_RETRIES = 3
+_RETRY_DELAY = 0.5  # saniye
 
-def _make_connection():
-    """
-    Build a psycopg2 connection directly, passing hostaddr as a kwarg so
-    psycopg2's C-level DNS is bypassed entirely (it would otherwise pick IPv6).
-    """
+
+def _build_connect_kwargs() -> dict:
     parsed = urlparse(settings.database_url)
     hostname = parsed.hostname
 
+    # IPv4 çözümlemeyi dene; başarısız olursa hostname ile devam et
     ipv4 = None
     try:
         results = socket.getaddrinfo(hostname, None, socket.AF_INET)
         if results:
             ipv4 = results[0][4][0]
-    except Exception as exc:
-        logger.warning("IPv4 resolution failed for %s: %s", hostname, exc)
-
-    if ipv4:
-        logger.info("DB: connecting to %s via IPv4 %s", hostname, ipv4)
-    else:
-        logger.warning("DB: no IPv4 found for %s — hostname fallback (may get IPv6)", hostname)
+    except Exception:
+        pass
 
     kwargs = {
         "host": hostname,
@@ -39,19 +35,43 @@ def _make_connection():
         "user": parsed.username,
         "password": unquote(parsed.password or ""),
         "dbname": (parsed.path or "").lstrip("/") or "postgres",
-        "connect_timeout": 10,
+        "connect_timeout": 15,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 5,
+        "keepalives_count": 3,
     }
     if ipv4:
         kwargs["hostaddr"] = ipv4
 
-    return psycopg2.connect(**kwargs)
+    return kwargs
+
+
+def _make_connection():
+    kwargs = _build_connect_kwargs()
+    last_exc = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return psycopg2.connect(**kwargs)
+        except psycopg2.OperationalError as exc:
+            last_exc = exc
+            if attempt < _MAX_RETRIES:
+                logger.warning("DB bağlantısı başarısız (deneme %d/%d): %s", attempt, _MAX_RETRIES, exc)
+                time.sleep(_RETRY_DELAY * attempt)
+    raise last_exc
 
 
 engine = create_engine(
     "postgresql+psycopg2://",
     creator=_make_connection,
-    poolclass=NullPool,
+    poolclass=QueuePool,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,       # kullanılmadan önce bağlantıyı test et
+    pool_recycle=300,         # 5 dakikada bir bağlantıları yenile
+    pool_timeout=20,
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

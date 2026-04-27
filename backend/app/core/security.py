@@ -1,4 +1,10 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+import bcrypt as _bcrypt_mod
+# passlib 1.7.4 + bcrypt 4.x uyumsuzluğu: bcrypt 4.0'dan itibaren __about__ kaldırıldı
+if not hasattr(_bcrypt_mod, "__about__"):
+    _bcrypt_mod.__about__ = SimpleNamespace(__version__=_bcrypt_mod.__version__)
 
 import jwt
 from passlib.context import CryptContext
