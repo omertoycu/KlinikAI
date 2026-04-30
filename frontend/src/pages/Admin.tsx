@@ -1,17 +1,42 @@
 import { useState } from "react";
-import { LayoutDashboard, FileText, Calendar, Lock } from "lucide-react";
+import {
+  LayoutDashboard, FileText, Calendar, Lock, Users,
+  Settings, BarChart2, CalendarDays,
+} from "lucide-react";
 import AppointmentTable from "@/components/admin/AppointmentTable";
+import AppointmentCalendar from "@/components/admin/AppointmentCalendar";
 import DocumentUploader from "@/components/admin/DocumentUploader";
+import DoctorManager from "@/components/admin/DoctorManager";
+import ClinicSettings from "@/components/admin/ClinicSettings";
+import Analytics from "@/components/admin/Analytics";
 import Button from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
-type Tab = "appointments" | "documents";
+type Tab = "calendar" | "appointments" | "doctors" | "analytics" | "documents" | "settings";
+
+const NAV_ITEMS: { id: Tab; label: string; icon: typeof Calendar }[] = [
+  { id: "calendar",     label: "Takvim",       icon: CalendarDays },
+  { id: "appointments", label: "Randevular",    icon: Calendar },
+  { id: "doctors",      label: "Doktorlar",     icon: Users },
+  { id: "analytics",   label: "Analitik",       icon: BarChart2 },
+  { id: "documents",   label: "Bilgi Bankası",  icon: FileText },
+  { id: "settings",    label: "Ayarlar",        icon: Settings },
+];
+
+const PAGE_TITLES: Record<Tab, string> = {
+  calendar:     "Randevu Takvimi",
+  appointments: "Randevu Listesi",
+  doctors:      "Doktor Yönetimi",
+  analytics:    "Analitik",
+  documents:    "AI Bilgi Bankası",
+  settings:     "Klinik Ayarları",
+};
 
 export default function Admin() {
   const [token, setToken] = useState(() => localStorage.getItem("admin_token") ?? "");
   const [tokenInput, setTokenInput] = useState("");
   const [authenticated, setAuthenticated] = useState(() => !!localStorage.getItem("admin_token"));
-  const [tab, setTab] = useState<Tab>("appointments");
+  const [tab, setTab] = useState<Tab>("calendar");
 
   function handleLogin() {
     if (!tokenInput.trim()) return;
@@ -28,19 +53,22 @@ export default function Admin() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8">
-          <div className="flex items-center gap-2 text-white font-bold text-xl mb-8">
-            <Lock className="text-violet-400" size={20} />
-            <span>Admin Girişi</span>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-3xl border border-outline-variant bg-surface-container-lowest p-8 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+              <Lock size={16} />
+            </div>
+            <span className="font-bold text-on-background text-xl font-manrope">Admin Girişi</span>
           </div>
+          <p className="text-secondary text-sm mb-6">Devam etmek için admin tokeninizi girin.</p>
           <input
             type="password"
             placeholder="Admin token"
             value={tokenInput}
             onChange={(e) => setTokenInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 mb-4"
+            className="w-full bg-surface-container-low border border-outline-variant rounded-2xl px-4 py-3 text-sm text-on-surface placeholder-secondary focus:outline-none focus:border-primary mb-4 transition-colors"
           />
           <Button className="w-full" onClick={handleLogin}>
             Giriş Yap
@@ -51,29 +79,27 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen bg-background">
       {/* Sidebar */}
-      <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-white/10 bg-black/30 backdrop-blur-xl flex flex-col">
-        <div className="px-6 py-5 border-b border-white/10">
-          <div className="text-white font-bold text-lg flex items-center gap-2">
-            <LayoutDashboard className="text-violet-400" size={18} />
-            KlinikAI Admin
+      <div className="fixed left-0 top-0 bottom-0 w-60 border-r border-outline-variant bg-surface-container-lowest flex flex-col">
+        <div className="px-6 py-5 border-b border-outline-variant">
+          <div className="text-primary font-bold text-lg flex items-center gap-2 font-manrope">
+            <LayoutDashboard size={18} className="text-primary" />
+            Klinik<span className="opacity-60">AI</span>
           </div>
+          <p className="text-secondary text-xs mt-0.5">Yönetim Paneli</p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-          {[
-            { id: "appointments" as Tab, label: "Randevular", icon: Calendar },
-            { id: "documents" as Tab, label: "Bilgi Bankası", icon: FileText },
-          ].map((item) => (
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
               onClick={() => setTab(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors",
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                 tab === item.id
-                  ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  ? "bg-primary-container text-on-primary-container border border-primary/20"
+                  : "text-secondary hover:text-primary hover:bg-surface-container"
               )}
             >
               <item.icon size={16} />
@@ -82,8 +108,8 @@ export default function Admin() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
-          <Button variant="ghost" size="sm" className="w-full" onClick={handleLogout}>
+        <div className="p-4 border-t border-outline-variant">
+          <Button variant="ghost" size="sm" className="w-full text-secondary hover:text-on-surface" onClick={handleLogout}>
             Çıkış Yap
           </Button>
         </div>
@@ -91,12 +117,14 @@ export default function Admin() {
 
       {/* Main content */}
       <main className="ml-60 p-8">
-        <h1 className="text-2xl font-bold text-white mb-8">
-          {tab === "appointments" ? "Randevu Yönetimi" : "AI Bilgi Bankası"}
-        </h1>
+        <h1 className="text-2xl font-bold text-on-background mb-8 font-manrope">{PAGE_TITLES[tab]}</h1>
 
+        {tab === "calendar"     && <AppointmentCalendar />}
         {tab === "appointments" && <AppointmentTable />}
-        {tab === "documents" && <DocumentUploader token={token} />}
+        {tab === "doctors"      && <DoctorManager token={token} />}
+        {tab === "analytics"    && <Analytics token={token} />}
+        {tab === "documents"    && <DocumentUploader token={token} />}
+        {tab === "settings"     && <ClinicSettings token={token} />}
       </main>
     </div>
   );

@@ -6,6 +6,7 @@ class AppointmentCreate(BaseModel):
     doctor_id: int
     patient_name: str
     patient_phone: str
+    patient_email: str | None = None
     datetime: datetime
     note: str = ""
 
@@ -20,8 +21,10 @@ class AppointmentOut(BaseModel):
     doctor_id: int
     patient_name: str
     patient_phone: str
+    patient_email: str | None
     datetime: datetime
     status: str
     note: str
+    cancel_token: str | None
 
     model_config = {"from_attributes": True}

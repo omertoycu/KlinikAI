@@ -9,10 +9,10 @@ interface NavbarProps {
 }
 
 const links = [
-  { label: "Hizmetler", href: "#hizmetler" },
-  { label: "AI Asistan", href: "#neden-biz" },
-  { label: "Hakkımızda", href: "#hakkimizda" },
-  { label: "Yorumlar", href: "#yorumlar" },
+  { label: "Hizmetler",  href: "#hizmetler",   external: false },
+  { label: "AI Asistan", href: "/asistan",      external: true  },
+  { label: "Hakkımızda", href: "#hakkimizda",   external: false },
+  { label: "Yorumlar",   href: "#yorumlar",      external: false },
 ];
 
 export default function Navbar({ onOpenChat }: NavbarProps) {
@@ -39,19 +39,29 @@ export default function Navbar({ onOpenChat }: NavbarProps) {
         </div>
 
         <div className="hidden md:flex space-x-8 text-sm font-bold">
-          {links.map((l, i) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className={`transition-colors pb-1 ${
-                i === 0
-                  ? "text-primary border-b-2 border-primary"
-                  : "text-secondary hover:text-primary"
-              }`}
-            >
-              {l.label}
-            </a>
-          ))}
+          {links.map((l, i) =>
+            l.external ? (
+              <Link
+                key={l.href}
+                to={l.href}
+                className="text-secondary hover:text-primary transition-colors pb-1"
+              >
+                {l.label}
+              </Link>
+            ) : (
+              <a
+                key={l.href}
+                href={l.href}
+                className={`transition-colors pb-1 ${
+                  i === 0
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-secondary hover:text-primary"
+                }`}
+              >
+                {l.label}
+              </a>
+            )
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -85,16 +95,27 @@ export default function Navbar({ onOpenChat }: NavbarProps) {
 
       {open && (
         <div className="md:hidden border-t border-outline-variant/30 bg-surface-container-lowest/95 backdrop-blur-xl px-6 py-4 flex flex-col gap-4">
-          {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="text-secondary hover:text-primary text-sm font-medium transition-colors"
-              onClick={() => setOpen(false)}
-            >
-              {l.label}
-            </a>
-          ))}
+          {links.map((l) =>
+            l.external ? (
+              <Link
+                key={l.href}
+                to={l.href}
+                className="text-secondary hover:text-primary text-sm font-medium transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                {l.label}
+              </Link>
+            ) : (
+              <a
+                key={l.href}
+                href={l.href}
+                className="text-secondary hover:text-primary text-sm font-medium transition-colors"
+                onClick={() => setOpen(false)}
+              >
+                {l.label}
+              </a>
+            )
+          )}
           <Button
             variant="primary"
             size="sm"

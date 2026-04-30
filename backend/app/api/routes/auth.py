@@ -16,7 +16,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
 
 
-def get_current_patient(
+def get_current_patient_data(
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> Patient:
@@ -26,9 +26,12 @@ def get_current_patient(
         patient_id = decode_access_token(credentials.credentials)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Geçersiz token")
+
     patient = db.query(Patient).filter(Patient.id == patient_id).first()
     if not patient:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı bulunamadı")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı bulunamadı"
+        )
     return patient
 
 
@@ -48,7 +51,6 @@ def register(body: PatientRegister, db: Session = Depends(get_db)):
     db.add(patient)
     db.commit()
     db.refresh(patient)
-
     return TokenResponse(
         access_token=create_access_token(patient.id),
         patient=PatientOut.model_validate(patient),
@@ -68,5 +70,5 @@ def login(body: PatientLogin, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=PatientOut)
-def me(current: Patient = Depends(get_current_patient)):
-    return PatientOut.model_validate(current)
+def me(patient: Patient = Depends(get_current_patient_data)):
+    return PatientOut.model_validate(patient)

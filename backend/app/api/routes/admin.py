@@ -2,29 +2,21 @@ import os
 import tempfile
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.core.deps import verify_admin as verify_token
 from app.models.document import KnowledgeDocument
 from app.services import rag_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-security = HTTPBearer(auto_error=False)
-
-
-def verify_token(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
-    if not credentials or credentials.credentials != settings.admin_token:
-        raise HTTPException(status_code=401, detail="Yetkisiz erişim")
-    return credentials.credentials
 
 
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
     _: str = Depends(verify_token),
+    db: Session = Depends(get_db),
 ):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Sadece PDF dosyaları desteklenmektedir")
@@ -52,8 +44,7 @@ async def upload_document(
         db.add(doc)
         db.commit()
         db.refresh(doc)
-
-        return {"id": doc.id, "filename": doc.filename, "chunk_count": chunk_count}
+        return {"id": doc.id, "filename": doc.filename, "chunk_count": doc.chunk_count}
     except HTTPException:
         raise
     except Exception as e:
@@ -61,15 +52,19 @@ async def upload_document(
 
 
 @router.get("/documents")
-def list_documents(db: Session = Depends(get_db), _: str = Depends(verify_token)):
+def list_documents(_: str = Depends(verify_token), db: Session = Depends(get_db)):
     try:
-        docs = db.query(KnowledgeDocument).order_by(KnowledgeDocument.uploaded_at.desc()).all()
+        docs = (
+            db.query(KnowledgeDocument)
+            .order_by(KnowledgeDocument.uploaded_at.desc())
+            .all()
+        )
         return [
             {
                 "id": d.id,
                 "filename": d.filename,
-                "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
-                "chunk_count": d.chunk_count,
+                "uploaded_at": d.uploaded_at,
+                "chunk_count": d.chunk_count or 0,
             }
             for d in docs
         ]
@@ -78,7 +73,9 @@ def list_documents(db: Session = Depends(get_db), _: str = Depends(verify_token)
 
 
 @router.delete("/documents/{doc_id}", status_code=204)
-def delete_document(doc_id: int, db: Session = Depends(get_db), _: str = Depends(verify_token)):
+def delete_document(
+    doc_id: int, _: str = Depends(verify_token), db: Session = Depends(get_db)
+):
     try:
         doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
         if not doc:
@@ -88,13 +85,11 @@ def delete_document(doc_id: int, db: Session = Depends(get_db), _: str = Depends
         db.delete(doc)
         db.commit()
 
-        # Belgeye ait vektör chunk'larını Supabase pgvector'dan da sil
         try:
             rag_service.delete_document_chunks(content_hash)
         except Exception:
-            pass  # vektör silme başarısız olsa bile metadata zaten silindi
+            pass
     except HTTPException:
         raise
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
